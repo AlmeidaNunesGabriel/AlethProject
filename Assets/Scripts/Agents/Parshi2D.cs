@@ -1,30 +1,90 @@
 using UnityEngine;
-using System.Collections;
 
 public class Parshi2D : Agent2D
 {
-    public override void EngageCombat(Agent2D other)
+    [Header("Collection System")]
+    [SerializeField] private int armorsCollected = 0;
+
+    [Header("Visual")]
+    private SpriteRenderer spriteRenderer;
+    private Color baseColor = Color.red;
+
+    protected override void Awake()
     {
-        other.TakeDamage(config.damage);
+        base.Awake();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        UpdateVisualAppearance();
     }
+
     public override void CollectResource(ResourceBase2D resource)
     {
-        if (resource is Gem2D)
+        if (resource is Armor2D)
         {
-            // handle gem collection
+            armorsCollected++;
+            Debug.Log($"{name} coletou armadura #{armorsCollected}!");
+
+            // Notifica o GameManager
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnParshiCollectedArmor();
+            }
+
+            UpdateVisualAppearance();
         }
-        else if (resource is Armor2D)
+        else if (resource is Gem2D)
         {
-            StartCoroutine(ApplyArmorBuff());
+            // Parshi também pode coletar gemas se não houver armaduras
+            Debug.Log($"{name} coletou gema (não é preferência)");
         }
     }
 
-    private IEnumerator ApplyArmorBuff()
+    private void UpdateVisualAppearance()
     {
-        int originalDamage = config.damage;
-        config.damage *= 10;
-        yield return new WaitForSeconds(10f);
-        config.damage = originalDamage;
+        if (spriteRenderer == null) return;
+
+        // Parshi fica mais escuro conforme coleta armaduras
+        float collectionLevel = armorsCollected / 5f;
+        Color evolvedColor = Color.Lerp(baseColor, Color.black, collectionLevel * 0.5f);
+        spriteRenderer.color = evolvedColor;
+
+        // Aumenta tamanho ligeiramente (menos que Alethi)
+        float scaleMultiplier = 1f + (armorsCollected * 0.03f);
+        transform.localScale = Vector3.one * Mathf.Min(scaleMultiplier, 1.3f);
     }
 
+    public override void EngageCombat(Agent2D enemy)
+    {
+        if (enemy == null || enemy.IsDead()) return;
+
+        float damage = config.damage;
+
+        // Parshi tem dano base mais alto mas não evolui tanto quanto Alethi
+        if (armorsCollected >= 3)
+        {
+            damage *= 1.2f; // 20% mais dano com 3+ armaduras
+            Debug.Log($"{name} usa proteção das armaduras! Dano aumentado para {damage}");
+        }
+
+        enemy.TakeDamage(damage);
+        Debug.Log($"{name} (Armaduras: {armorsCollected}) atacou {enemy.name} causando {damage} de dano");
+    }
+
+    // Métodos para consulta
+    public int GetArmorsCollected()
+    {
+        return armorsCollected;
+    }
+
+    // Override para mostrar informações visuais
+    protected override void OnDrawGizmos()
+    {
+        base.OnDrawGizmos();
+
+        // Mostra nível de coleta
+        if (armorsCollected > 0)
+        {
+            Gizmos.color = Color.black;
+            Gizmos.DrawWireSphere(transform.position, 0.4f + (armorsCollected * 0.05f));
+        }
+    }
 }

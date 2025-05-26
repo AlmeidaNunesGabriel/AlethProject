@@ -1,34 +1,74 @@
 using UnityEngine;
-using System.Collections;
+
 public class CollectState2D : AgentState
 {
-    private ResourceBase2D resource;
-    private bool isCollecting;
-    private const float stopThreshold = 0.2f;
-    public CollectState2D(Agent2D agent, ResourceBase2D res) : base(agent)
+    private ResourceBase2D targetResource;
+    private float collectTimer;
+    private float stopThreshold = 0.5f;
+
+    public CollectState2D(Agent2D agent, ResourceBase2D resource) : base(agent)
     {
-        resource = res;
-        isCollecting = false;
+        targetResource = resource;
     }
+
     public override void OnEnter()
     {
-        agent.MoveTo(resource.transform.position);
+        collectTimer = 0f;
+
+        // Verificação inicial - se o recurso já foi destruído, volta para busca
+        if (targetResource == null)
+        {
+            agent.TransitionToState(new SearchState2D(agent));
+            return;
+        }
+
+        Debug.Log($"{agent.name} iniciando coleta de {targetResource.name}");
     }
+
     public override void Tick()
     {
-        float dist = Vector2.Distance(agent.transform.position, resource.transform.position);
-        if(!isCollecting && dist < stopThreshold) {
-            isCollecting = true;
-            // stop movement by setting target to current pos
-            agent.MoveTo(agent.transform.position);
-            agent.StartCoroutine(DoCollect());
+        // Verificação contínua - se o recurso foi destruído durante a coleta
+        if (targetResource == null)
+        {
+            Debug.Log($"{agent.name} perdeu o recurso alvo, voltando para busca");
+            agent.TransitionToState(new SearchState2D(agent));
+            return;
+        }
+
+        float distanceToResource = Vector2.Distance(agent.transform.position, targetResource.transform.position);
+
+        // Se ainda não chegou no recurso, continua se movendo
+        if (distanceToResource > stopThreshold)
+        {
+            agent.MoveTo(targetResource.transform.position);
+            return;
+        }
+
+        // Parou próximo ao recurso, inicia contagem de coleta
+        agent.MoveTo(agent.transform.position); // Para o movimento
+
+        collectTimer += Time.deltaTime;
+
+        // Verifica novamente se o recurso ainda existe antes de coletar
+        if (collectTimer >= agent.config.collectTime)
+        {
+            if (targetResource != null) // Verificação final antes de coletar
+            {
+                agent.CollectResource(targetResource);
+                Debug.Log($"{agent.name} coletou {targetResource.name}");
+
+                // Destrói o recurso após coleta bem-sucedida
+                Object.Destroy(targetResource.gameObject);
+            }
+
+            // Volta para busca independentemente
+            agent.TransitionToState(new SearchState2D(agent));
         }
     }
-    private IEnumerator DoCollect()
+
+    public override void OnExit()
     {
-        yield return new WaitForSeconds(agent.config.collectTime);
-        agent.CollectResource(resource);
-        GameObject.Destroy(resource.gameObject);
-        agent.TransitionToState(new SearchState2D(agent));
+        collectTimer = 0f;
+        Debug.Log($"{agent.name} saindo do estado de coleta");
     }
 }

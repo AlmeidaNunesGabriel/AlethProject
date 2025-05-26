@@ -1,12 +1,26 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "AgentConfig", menuName = "Scriptable Objects/AgentConfig")]
+[CreateAssetMenu(fileName = "NewAgentConfig", menuName = "Configs/AgentConfig")]
 public class AgentConfig : ScriptableObject
 {
-    public float health;
-    public float speed;
-    public int damage;
-    public float collectTime;     // segundos para coletar recurso
-    public int groupCombatRatio;  // ex: 2 Alethi = 1 Parshi
-}
+    [Header("Base Stats")]
+    public float health = 100f;
+    public float speed = 3f;
+    public int damage = 10;
+    public float collectTime = 2f;
+    public int groupCombatRatio = 2;
 
+    [Header("Balance Notes")]
+    [TextArea(3, 5)]
+    public string notes = "Configurações base do agente. Alethi evoluem com gemas coletadas.";
+
+    private void OnValidate()
+    {
+        // Garante valores mínimos
+        health = Mathf.Max(1f, health);
+        speed = Mathf.Max(0.1f, speed);
+        damage = Mathf.Max(1, damage);
+        collectTime = Mathf.Max(0.1f, collectTime);
+        groupCombatRatio = Mathf.Max(1, groupCombatRatio);
+    }
+}
